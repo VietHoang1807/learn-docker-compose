@@ -1,0 +1,26 @@
+{
+  "name": "dbz-oracle-connector",
+  "config": {
+    "tasks.max": "1",
+    "connector.class": "io.debezium.connector.oracle.OracleConnector",
+    "database.user": "spphcm",
+    "database.password": "spphcm",
+    "database.url": "jdbc:oracle:thin:@45.122.253.178:3151:spphcm",
+    "database.dbname": "spphcm",
+    "plugin.name": "pgoutput",
+    "database.server.name": "oracle_server",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "table.include.list": "logs_common",
+    "slot.name" : "dbz_sales_transaction_slot",
+    "topic.prefix": "dbz-oracle",
+    "snapshot.mode": "schema_only_recovery",
+    "schema.history.internal.store.only.captured.tables.ddl": "false",
+    "schema.history.internal.kafka.bootstrap.servers" : "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.inventory"
+  }
+}

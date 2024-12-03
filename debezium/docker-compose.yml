@@ -1,37 +1,86 @@
-version: '2'
+version: "3.7"
 services:
+  postgres:
+    image: debezium/postgres:13
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=debezium_master
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=pgadmin4@javapuzzle.com
+      - PGADMIN_DEFAULT_PASSWORD=admin1234
+    ports:
+      - '5051:80'
+    restart: always
+
   zookeeper:
-    image: quay.io/debezium/zookeeper:${DEBEZIUM_VERSION}
-    ports:
-     - 2181:2181
-     - 2888:2888
-     - 3888:3888
+    image: confluentinc/cp-zookeeper:7.7.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
   kafka:
-    image: quay.io/debezium/kafka:${DEBEZIUM_VERSION}
-    ports:
-     - 9092:9092
-    links:
-     - zookeeper
+    image: confluentinc/cp-enterprise-kafka:7.7.1
+    container_name: kafka_debezium
+    depends_on: [zookeeper]
     environment:
-     - ZOOKEEPER_CONNECT=zookeeper:2181
-  connect:
-    image: debezium/connect-with-oracle-jdbc:${DEBEZIUM_VERSION}
-    build:
-      context: debezium-with-oracle-jdbc
-      args:
-        DEBEZIUM_VERSION: ${DEBEZIUM_VERSION}
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-     - 8083:8083
-     - 5005:5005
-    links:
-     - kafka
+      - 9092:9092
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.1
     environment:
-     - BOOTSTRAP_SERVERS=kafka:9092
-     - GROUP_ID=1
-     - CONFIG_STORAGE_TOPIC=my_connect_configs
-     - OFFSET_STORAGE_TOPIC=my_connect_offsets
-     - STATUS_STORAGE_TOPIC=my_connect_statuses
-     - LD_LIBRARY_PATH=/instant_client
-     - KAFKA_DEBUG=true
-     - DEBUG_SUSPEND_FLAG=n
-     - JAVA_DEBUG_PORT=0.0.0.0:5005
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=kafka:9092
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:8081,http://localhost:8081
+    ports:
+      - 8081:8081
+    depends_on: [ zookeeper, kafka ]
+
+  debezium:
+    image: debezium/connect:2.7.3.Final
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+      KAFKA_CONNECT_PLUGINS_DIR: /kafka/connect/
+#      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+#      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    depends_on: [kafka]
+    links: [zookeeper, kafka, postgres, schema-registry]
+    ports:
+      - 8083:8083
+      - 9012:9012
+    volumes:
+      #When you follow debezium documentation
+      #- ./lib-registry-doc-debezium:/kafka/connect/libs
+      - ./confluentinc-kafka-connect-avro-converter-7.5.3/lib:/kafka/connect/libs
+
+  debezium-ui:
+    image: debezium/debezium-ui:latest
+    environment:
+      KAFKA_CONNECT_URIS: http://debezium:8083
+    ports:
+      - 8080:8080
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka_debezium:9092
+    ports:
+      - 9089:8080
+    links:
+      - kafka
