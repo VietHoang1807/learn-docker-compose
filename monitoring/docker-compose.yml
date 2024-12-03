@@ -1,0 +1,37 @@
+version: '3.7'
+
+services:
+  grafana:
+    image: grafana/grafana:9.5.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - extenal
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - extenal
+  zipkin:
+    image: bitnami/zipkin:3.4.1
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=mem
+      # Uncomment to enable self-tracing
+      - SELF_TRACING_ENABLED=true
+      # Uncomment to increase heap size
+      - JAVA_OPTS=-Xms128m -Xmx128m -XX:+ExitOnOutOfMemoryError
+    command: --logging.level.zipkin2=DEBUG
+
+networks:
+  extenal:
